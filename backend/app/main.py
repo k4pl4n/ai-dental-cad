@@ -81,11 +81,24 @@ def list_cases():
     return store.list_cases()
 
 
+STALE_MINUTES = 20
+
+
 @app.get("/cases/{case_id}")
 def get_case(case_id: str):
     case = store.load_case(case_id)
     if not case:
         raise HTTPException(404, "Case not found")
+    # Recovery: if a background task died (e.g. instance restart), don't
+    # leave the dentist watching a spinner forever.
+    from datetime import datetime, timezone, timedelta
+    if case.status in (CaseStatus.ANALYSING, CaseStatus.DESIGNING):
+        age = datetime.now(timezone.utc) - case.updated_at
+        if age > timedelta(minutes=STALE_MINUTES):
+            case.error = ("Processing was interrupted (server restart). "
+                          "Please start the case again — your files are safe.")
+            case.status = CaseStatus.FAILED
+            store.save_case(case)
     d = case.model_dump(mode="json")
     d["traffic_light"] = pipeline.traffic_light(case)
     d["flagged_teeth"] = (layer2_perception.flagged_teeth(case.perception)
