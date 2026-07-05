@@ -58,11 +58,15 @@ export interface CaseData {
   } | null;
 }
 
-export async function createCase(upper: File | null, lower: File | null, description: string) {
+export async function createCase(
+  upper: File | null, lower: File | null, description: string,
+  designArch: "upper" | "lower" = "upper"
+) {
   const fd = new FormData();
   if (upper) fd.append("upper", upper);
   if (lower) fd.append("lower", lower);
   fd.append("description", description);
+  fd.append("design_arch", designArch);
   const r = await fetch(`${BASE}/cases`, { method: "POST", body: fd });
   if (!r.ok) throw new Error((await r.json()).detail || "Upload failed");
   return r.json() as Promise<{ case_id: string; reference: string }>;
