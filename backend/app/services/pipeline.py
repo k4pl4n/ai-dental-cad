@@ -97,6 +97,9 @@ def analyse(case: Case, upper_path: str | None, lower_path: str | None) -> Case:
     except layer1_ingestion.IngestionError as e:
         case.error = str(e)
         _set_status(case, CaseStatus.FAILED)
+    except claude_client.ClaudeError as e:
+        case.error = str(e)                          # config errors shown verbatim
+        _set_status(case, CaseStatus.FAILED)
     except Exception as e:
         log.error("analyse failed case=%s: %s\n%s", case.case_id, e, traceback.format_exc())
         case.error = "Analysis failed. Please try again or contact support."

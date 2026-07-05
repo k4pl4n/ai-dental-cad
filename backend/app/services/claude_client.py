@@ -26,6 +26,10 @@ class ClaudeError(Exception):
 
 
 def _client():
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise ClaudeError(
+            "AI is not configured on this server: ANTHROPIC_API_KEY is missing. "
+            "Add it in Railway → aidcad-backend → Variables (and set AIDCAD_MOCK=0).")
     try:
         import anthropic
     except ImportError as e:
@@ -130,7 +134,9 @@ def _mock_perception(lo: int = 1, hi: int = 16) -> dict:
                       "confidence": conf, "observation": obs})
     return {
         "teeth": teeth,
-        "arch_summary": ("The upper arch presents generalised moderate-to-severe wear with reduced "
+        "arch_summary": ("⚠ TEST MODE — this is canned demonstration data, the AI has NOT looked at "
+                         "your scan. Set ANTHROPIC_API_KEY and AIDCAD_MOCK=0 on the backend service. "
+                         "The upper arch presents generalised moderate-to-severe wear with reduced "
                          "vertical dimension. Teeth 3 and 14 are prepared for full-coverage crowns. "
                          "Tooth 5 is missing with intact neighbours. The anterior segment shows marked "
                          "incisal wear consistent with parafunction."),
@@ -160,7 +166,8 @@ def _mock_plan(lower: bool = False) -> dict:
         "framework": {"vd_increase_mm": 3.0, "occlusal_plane_tilt_deg": 0.0,
                       "incisal_crown_length_mm": 11.0, "symmetric": True,
                       "symmetry_rationale": ""},
-        "plan_summary": ("Full-arch rehabilitation restoring lost vertical dimension by 3mm. Posterior "
+        "plan_summary": ("⚠ TEST MODE — canned demonstration plan, not based on your scan. "
+                         "Full-arch rehabilitation restoring lost vertical dimension by 3mm. Posterior "
                          "support established with zirconia crowns on 2, 3, 14, 15; anterior aesthetics "
                          "and incisal edge position restored with layered zirconia on 7–10. Tooth 5 gap "
                          "noted; no fixture visible — implant consult recommended."),
