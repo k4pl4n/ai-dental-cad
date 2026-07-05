@@ -266,3 +266,4 @@ class Case(BaseModel):
     validation: Optional[ValidationReport] = None
     package_path: Optional[str] = None
     corrections: list[Correction] = []
+    bite_metrics: Optional[dict] = None   # measured from the registered raw pair
