@@ -108,8 +108,10 @@ def analyse(case: Case, upper_path: str | None, lower_path: str | None) -> Case:
 
 
 def _primary_scan(case: Case):
+    """The arch this case designs — dentist's choice, default upper."""
+    want = getattr(case, "design_arch", "upper") or "upper"
     for s in case.scans:
-        if s.arch == Arch.UPPER:
+        if s.arch.value == want:
             return s
     return case.scans[0]
 
@@ -140,10 +142,14 @@ def design(case: Case) -> Case:
         _audit(case, "ai_decision",
                f"framework built, target VD z={framework.target_vd_z:.2f}mm")
 
-        # Layer 5
+        # Layer 5 — opposing arch (bite-registered) drives occlusal targets
+        opposing_scan = next((s for s in case.scans if s.arch != primary.arch), None)
         case.restorations = layer5_generation.generate_all(
             case.plan.restorations, framework, primary.file_path,
-            case_dir(case, "restorations"))
+            case_dir(case, "restorations"),
+            opposing_raw_path=(opposing_scan.raw_path
+                               if opposing_scan and opposing_scan.raw_path else None),
+            norm_transform=primary.norm_transform)
         failed = [r.tooth_number for r in case.restorations if r.failed]
         if failed:
             _audit(case, "ai_decision", f"generation failures on teeth {failed}")
