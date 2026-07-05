@@ -13,7 +13,7 @@ import os
 import traceback
 
 from ..layers import (
-    layer1_ingestion, layer2_perception, layer3_reasoning,
+    layer1_bite, layer1_ingestion, layer2_perception, layer3_reasoning,
     layer4_framework, layer5_generation, layer6_output, layer6_validation,
 )
 from ..models.schemas import (
@@ -63,6 +63,12 @@ def analyse(case: Case, upper_path: str | None, lower_path: str | None) -> Case:
         if not case.scans:
             raise layer1_ingestion.IngestionError("No scan file was provided.")
 
+        # Bite: measured from the RAW pair in the scanner's registered frame
+        if upper_path and lower_path:
+            case.bite_metrics = layer1_bite.measure_bite(upper_path, lower_path)
+            if case.bite_metrics:
+                _audit(case, "ai_decision", f"bite measured: {case.bite_metrics}")
+
         primary = _primary_scan(case)
 
         # Layer 2 — perception
@@ -77,8 +83,9 @@ def analyse(case: Case, upper_path: str | None, lower_path: str | None) -> Case:
             _set_status(case, CaseStatus.ASSESSMENT_REVIEW)
             return case
 
-        # Layer 3 — reasoning
-        plan = layer3_reasoning.plan_treatment(perception, case.description)
+        # Layer 3 — reasoning (with measured bite context when available)
+        plan = layer3_reasoning.plan_treatment(perception, case.description,
+                                               bite_metrics=case.bite_metrics)
         case.plan = plan
         _audit(case, "ai_decision",
                f"plan produced: {len(plan.restorations)} restorations, "
