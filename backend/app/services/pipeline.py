@@ -54,7 +54,8 @@ def analyse(case: Case, upper_path: str | None, lower_path: str | None) -> Case:
                 continue
             scan = layer1_ingestion.ingest(
                 path, case.case_id, case_dir(case, "scans"),
-                original_filename=os.path.basename(path))
+                original_filename=os.path.basename(path),
+                expected_arch=Arch(label))
             case.scans.append(scan)
             _audit(case, "ai_decision",
                    f"ingested {label} file as {scan.arch.value} arch "
