@@ -193,8 +193,14 @@ def repair_if_needed(mesh: trimesh.Trimesh, metrics: MeshMetrics) -> tuple[trime
 # ------------------------------------------------------------------ entry
 
 def ingest(file_path: str, case_id: str, out_dir: str,
-           original_filename: str = "", strict: bool = True) -> IngestedScan:
-    """Full Layer-1 pipeline for one uploaded file."""
+           original_filename: str = "", strict: bool = True,
+           expected_arch: Arch | None = None) -> IngestedScan:
+    """Full Layer-1 pipeline for one uploaded file.
+
+    expected_arch: which upload slot the dentist used (upper/lower zone).
+    Real prep scans often exclude the palate, which defeats pure geometric
+    detection — so the dentist's explicit slot choice wins, and geometry
+    is used as a cross-check that logs a warning on disagreement."""
     mesh = _load_mesh(file_path)
     _validate(mesh, strict=strict)
 
@@ -204,7 +210,14 @@ def ingest(file_path: str, case_id: str, out_dir: str,
     if repairs:
         metrics = extract_metrics(mesh)
 
-    arch = detect_arch(mesh)
+    detected = detect_arch(mesh)
+    if expected_arch is not None and detected != expected_arch:
+        log.warning("case=%s: uploaded in %s slot but geometry suggests %s — "
+                    "using the dentist's slot", case_id,
+                    expected_arch.value, detected.value)
+        repairs = repairs + [f"arch check: geometry suggested {detected.value}, "
+                             f"kept dentist's {expected_arch.value} slot"]
+    arch = expected_arch or detected
     measurements = measure_arch(mesh)
 
     os.makedirs(out_dir, exist_ok=True)
