@@ -1,0 +1,11 @@
+# Netlify config — deploy from the frontend/ directory:
+#   cd frontend && netlify deploy --build --prod
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Set the real backend URL after `railway domain`:
+#   netlify env:set NEXT_PUBLIC_API_URL https://<your-app>.up.railway.app
