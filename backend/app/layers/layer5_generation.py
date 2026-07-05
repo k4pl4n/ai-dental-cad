@@ -162,17 +162,35 @@ def _crown_mesh(target: ToothTarget, tooth_type: str,
     return mesh
 
 
+def _decimate_for_fitting(scan: trimesh.Trimesh,
+                          max_faces: int = 60_000) -> trimesh.Trimesh:
+    """Cap mesh size for margin fitting — real clinic scans can be 500k+
+    faces, which blows memory on small cloud instances. Local-surface
+    queries don't need full resolution."""
+    if len(scan.faces) <= max_faces:
+        return scan
+    try:
+        return scan.simplify_quadric_decimation(face_count=max_faces)
+    except Exception:
+        return scan
+
+
 def _fit_margin(pts_xy: np.ndarray, base_z: float, scan) -> np.ndarray:
     """Margin ring z: follow local scan surface where available (fit the
-    prep at the bottom), else flat at base_z."""
+    prep at the bottom), else flat at base_z. Uses a KD-tree — O(log n)
+    per query instead of a full vertex sweep."""
     if scan is None:
         return np.full(len(pts_xy), base_z)
+    from scipy.spatial import cKDTree
     v = scan.vertices
+    tree = getattr(scan, "_aidcad_xy_tree", None)
+    if tree is None:
+        tree = cKDTree(v[:, :2])
+        scan._aidcad_xy_tree = tree
     z = np.empty(len(pts_xy))
     for i, p in enumerate(pts_xy):
-        d = np.linalg.norm(v[:, :2] - p, axis=1)
-        near = v[d < 1.5]
-        z[i] = float(np.percentile(near[:, 2], 30)) if len(near) > 5 else base_z
+        idx = tree.query_ball_point(p, r=1.5)
+        z[i] = float(np.percentile(v[idx, 2], 30)) if len(idx) > 5 else base_z
     # clamp margin within sane band of base_z
     return np.clip(z, base_z - 2.0, base_z + 2.0)
 
@@ -187,6 +205,7 @@ def generate_all(plan_restorations: list[PlannedRestoration],
     are marked failed without stopping the rest (PLAN Part 6)."""
     os.makedirs(out_dir, exist_ok=True)
     scan = trimesh.load(scan_path, force="mesh")
+    scan = _decimate_for_fitting(scan)
     targets = {t.tooth_number: t for t in framework.tooth_targets}
     _clamp_widths_to_slots(targets)
     results: list[GeneratedRestoration] = []
@@ -268,9 +287,15 @@ def _generate_one(r: PlannedRestoration, target: ToothTarget | None,
 
 
 def _base_z(r: PlannedRestoration, target: ToothTarget, scan: trimesh.Trimesh) -> float:
+    from scipy.spatial import cKDTree
     v = scan.vertices
-    d = np.linalg.norm(v[:, :2] - np.array(target.position[:2]), axis=1)
-    local = v[d < target.mesiodistal_width_mm * 0.6]
+    tree = getattr(scan, "_aidcad_xy_tree", None)
+    if tree is None:
+        tree = cKDTree(v[:, :2])
+        scan._aidcad_xy_tree = tree
+    idx = tree.query_ball_point(np.array(target.position[:2]),
+                                r=target.mesiodistal_width_mm * 0.6)
+    local = v[idx]
     if r.restoration_type == RestorationType.BRIDGE_PONTIC:
         # pontic contacts the ridge tissue below (DEV_PLAN Step 6)
         return float(np.percentile(local[:, 2], 55)) if len(local) else target.position[2]

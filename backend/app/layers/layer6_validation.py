@@ -138,6 +138,11 @@ def _check4_occlusal_contacts(rest, meshes, framework, opposing_path) -> Validat
             details="single-arch case: no opposing scan uploaded; contact simulation skipped "
                     "(noted in case report — clinician must verify occlusion)")
     opposing = trimesh.load(opposing_path, force="mesh")
+    if len(opposing.faces) > 40_000:                 # memory cap for cloud instances
+        try:
+            opposing = opposing.simplify_quadric_decimation(face_count=40_000)
+        except Exception:
+            pass
     pq = trimesh.proximity.ProximityQuery(opposing)
     contacts = {"right": 0, "left": 0}
     hyper: dict[int, str] = {}
