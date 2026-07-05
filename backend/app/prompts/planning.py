@@ -32,6 +32,13 @@ def build_planning_prompt(perception_json: str, dentist_note: str, arch: str) ->
 - missing, adjacent teeth are being restored → bridge_pontic spanning between the adjacent restorations.
 - Anterior wear cases (any worn incisor or canine) → the plan MUST include incisal edge repositioning via the anterior incisal target parameter.
 
+FULL-ARCH IMPLANT CASES (All-on-4 / All-on-6) — apply when the assessment shows 4–6 implant_fixture positions on an otherwise edentulous arch, or the dentist's request mentions All-on-4/All-on-6/full-arch implant prosthesis:
+- Plan an implant-supported full-arch bridge: implant_crown at every implant_fixture position, and bridge_pontic at every other position that should carry a visible tooth (second molar to second molar — 12 units per arch is standard; skip third molars).
+- Material: zirconia for all units (monolithic full-arch zirconia bridge), zirconia_layered for the anterior units if aesthetics are emphasised in the request.
+- needs_physical_preparation = false for all units (the arch is implant-borne).
+- State clearly in plan_summary that the units form ONE fused full-arch bridge screwed onto the fixtures, and how many fixtures support it.
+- The 16-restorations-per-arch limit still applies; a standard All-on-X plan has 12 units per arch.
+
 Material defaults: zirconia for posterior full crowns and bridge pontics; zirconia_layered or lithium_disilicate for anterior crowns and veneers (prefer lithium_disilicate for single anteriors, zirconia_layered in full-arch cases); zirconia for implant crowns. Override only with clinical justification in the rationale.
 
 Design priority by position — this is generation order, not importance:

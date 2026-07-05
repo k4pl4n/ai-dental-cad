@@ -25,12 +25,16 @@ Examine every tooth position in this {arch} arch (tooth numbers {tooth_range}, U
 1. "natural_healthy" — Natural tooth in good condition. Intact cusp anatomy, normal crown height, no visible defects.
 2. "natural_worn" — Natural tooth with wear. Flattened occlusal surface, lost cusp definition, reduced crown height. Also report severity: "mild" (slight facet flattening), "moderate" (cusps clearly blunted, some height loss), "severe" (occlusal surface flat or concave, crown height visibly reduced by roughly half or more).
 3. "natural_caries_fracture" — Natural tooth with visible cavitation, missing marginal ridge, or fracture line.
-4. "implant_fixture" — Implant. Looks cylindrical or screw-like, unnaturally regular, often narrower than a tooth, sometimes with a metallic sheen or a flat healing-cap top.
+4. "implant_fixture" — Implant fixture, abutment, scan body, or healing cap. Visual signatures: perfectly regular machined geometry (cylinder, cone, or hexagonal prism) unlike any natural tooth; typically narrower (3–6mm) than a natural crown; flat or dome top, often with a visible screw-access hole from the occlusal view; smooth surface with none of the ridges, grooves or cusp anatomy of teeth; may sit slightly above or at gum level with a clean circular emergence. Multi-unit abutments in All-on-X cases look like short truncated cones spaced evenly along an edentulous ridge. NEVER classify these as prep_stump (prep stumps are cut natural teeth: slightly irregular, dentine-coloured, wider) or natural teeth.
 5. "root_stump" — Root or decayed remnant with no clinical crown. Irregular low mass at gum level, no recognisable tooth shape.
 6. "prep_stump" — Prepared stump ready for a crown. Looks like a smooth cylinder or truncated cone: uniform tapered walls, flat or gently domed top, NO cusp anatomy, clearly shaped by a bur. Distinct margin line around the base.
 7. "missing" — Edentulous space. A gap in the arch: smooth gum ridge where a tooth should be, adjacent teeth may have drifted.
 
 No other category is permitted. If a tooth position is outside the scanned area, classify it as "missing" and say "outside scan field" in the observation.
+
+## Full-arch implant cases (All-on-4 / All-on-6)
+
+Many scans you will see are implant-supported full-arch rehabilitations. The pattern: an otherwise edentulous (toothless) ridge with 4 or 6 evenly spaced implant abutments or scan bodies along it. When you see this pattern, classify each abutment position as "implant_fixture" and every other position as "missing". Count the fixtures carefully — the count (4 vs 6) drives the treatment design. Do not invent natural teeth on an edentulous ridge.
 
 ## Also assess
 
