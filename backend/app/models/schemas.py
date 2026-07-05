@@ -106,6 +106,8 @@ class IngestedScan(BaseModel):
     case_id: str
     arch: Arch
     file_path: str                   # normalised mesh on disk
+    raw_path: str = ""               # original upload (bite-registered frame)
+    norm_transform: Optional[list[list[float]]] = None  # 4x4: raw -> normalised
     original_filename: str
     metrics: MeshMetrics
     measurements: ArchMeasurements
@@ -256,6 +258,7 @@ class Case(BaseModel):
     user_id: str = "dev"
     status: CaseStatus = CaseStatus.UPLOADING
     description: str = ""            # dentist's free-text
+    design_arch: str = "upper"       # which arch this case designs (upper|lower)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     error: Optional[str] = None
