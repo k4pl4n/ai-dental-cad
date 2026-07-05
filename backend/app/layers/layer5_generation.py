@@ -240,7 +240,7 @@ def _clamp_widths_to_slots(targets: dict[int, "ToothTarget"]) -> None:
             t.position = [float(centre[0]), float(centre[1]), t.position[2]]
             # crown spans exactly between its two slot midpoints
             span = mids[1] - mids[0]
-            t.mesiodistal_width_mm = 0.995 * float(np.linalg.norm(span))
+            t.mesiodistal_width_mm = 0.985 * float(np.linalg.norm(span))
             t.tangent_deg = float(np.degrees(np.arctan2(span[1], span[0])))
         elif len(mids) == 1:
             t.mesiodistal_width_mm = min(t.mesiodistal_width_mm,

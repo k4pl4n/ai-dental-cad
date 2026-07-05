@@ -37,9 +37,12 @@ class PlanningError(Exception):
     pass
 
 
-def plan_treatment(perception: PerceptionResult, dentist_note: str) -> TreatmentPlan:
+def plan_treatment(perception: PerceptionResult, dentist_note: str,
+                   bite_metrics: dict | None = None) -> TreatmentPlan:
+    from .layer1_bite import bite_context_for_prompt
     prompt = build_planning_prompt(
-        perception_to_json(perception), dentist_note, perception.arch.value)
+        perception_to_json(perception), dentist_note, perception.arch.value,
+        bite_context=bite_context_for_prompt(bite_metrics))
     raw, _model = claude_client.planning_call(prompt)
 
     restorations = _parse_restorations(raw)
