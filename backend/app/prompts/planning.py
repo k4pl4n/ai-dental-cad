@@ -8,7 +8,8 @@ reason from first principles.
 PLANNING_SYSTEM = """You are an expert prosthodontist producing a full-mouth rehabilitation plan from a completed clinical assessment. You follow the clinical algorithm you are given exactly. You output strict JSON only."""
 
 
-def build_planning_prompt(perception_json: str, dentist_note: str, arch: str) -> str:
+def build_planning_prompt(perception_json: str, dentist_note: str, arch: str,
+                          bite_context: str = "") -> str:
     note = dentist_note.strip() or "(none provided)"
     return f"""## Clinical assessment (per-tooth perception output for the {arch} arch)
 
@@ -17,6 +18,7 @@ def build_planning_prompt(perception_json: str, dentist_note: str, arch: str) ->
 ## Dentist's request
 
 "{note}"
+{bite_context}
 
 ## Clinical algorithm — apply these rules exactly
 
