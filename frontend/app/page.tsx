@@ -29,13 +29,14 @@ export default function UploadScreen() {
   const [upper, setUpper] = useState<File | null>(null);
   const [lower, setLower] = useState<File | null>(null);
   const [description, setDescription] = useState("");
+  const [designArch, setDesignArch] = useState<"upper" | "lower">("upper");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function analyse() {
     setBusy(true); setError("");
     try {
-      const { case_id } = await createCase(upper, lower, description);
+      const { case_id } = await createCase(upper, lower, description, designArch);
       router.push(`/case/${case_id}`);
     } catch (e: any) {
       setError(e.message); setBusy(false);
@@ -59,7 +60,21 @@ export default function UploadScreen() {
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
-        <div style={{ marginTop: 20, textAlign: "right" }}>
+        <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: 14, color: "var(--muted)" }}>
+            Design restorations for:{" "}
+            <label style={{ marginLeft: 8, cursor: "pointer" }}>
+              <input type="radio" checked={designArch === "upper"}
+                     onChange={() => setDesignArch("upper")} /> Upper arch
+            </label>
+            <label style={{ marginLeft: 14, cursor: "pointer" }}>
+              <input type="radio" checked={designArch === "lower"}
+                     onChange={() => setDesignArch("lower")} /> Lower arch
+            </label>
+            <div style={{ fontSize: 12.5, marginTop: 4 }}>
+              Upload both scans either way — the opposing arch sets the bite.
+            </div>
+          </div>
           <button className="btn big" disabled={busy || (!upper && !lower)} onClick={analyse}>
             {busy ? "Uploading…" : "Analyse"}
           </button>
