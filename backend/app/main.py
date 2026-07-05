@@ -48,10 +48,13 @@ def health():
 async def create_case(background: BackgroundTasks,
                       upper: UploadFile | None = File(None),
                       lower: UploadFile | None = File(None),
-                      description: str = Form("")):
+                      description: str = Form(""),
+                      design_arch: str = Form("upper")):
     if upper is None and lower is None:
         raise HTTPException(422, "Upload at least one arch scan (STL or PLY).")
-    case = Case(description=description[:2000])
+    if design_arch not in ("upper", "lower"):
+        design_arch = "upper"
+    case = Case(description=description[:2000], design_arch=design_arch)
     store.save_case(case)
     store.add_audit(AuditEvent(case_id=case.case_id, event="upload",
                                detail=f"upper={getattr(upper,'filename',None)} "
