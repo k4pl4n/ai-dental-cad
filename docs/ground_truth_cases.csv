@@ -1,0 +1,6 @@
+case,bite_height_mm,contacts_before,contacts_after,min_gap_before_mm,min_gap_after_mm,median_gap_before_mm,median_gap_after_mm,restoration_fill_mm
+1,53.02,25,441,0.077,0.029,10.0,5.15,4.85
+2,35.62,0,521,2.831,0.027,11.04,4.67,6.37
+3,34.28,0,274,2.523,0.089,9.71,7.19,2.52
+4,36.41,2,190,0.404,0.08,11.15,6.35,4.8
+5,30.81,123,412,0.038,0.052,9.24,5.88,3.36
