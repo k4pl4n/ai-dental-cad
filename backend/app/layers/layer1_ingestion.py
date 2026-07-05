@@ -66,10 +66,16 @@ def _validate(mesh: trimesh.Trimesh, strict: bool = True) -> None:
 
 # ------------------------------------------------------- PCA normalisation
 
-def normalise_orientation(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
+def normalise_orientation(mesh: trimesh.Trimesh,
+                          return_transform: bool = False):
     """Rotate so mesial-distal = X (largest spread), buccal-lingual = Y,
-    occlusal-apical = Z, with occlusal pointing +Z. Centre on origin (XY)."""
-    verts = mesh.vertices - mesh.vertices.mean(axis=0)
+    occlusal-apical = Z, with occlusal pointing +Z. Centre on origin (XY).
+
+    With return_transform=True also returns the 4x4 matrix M such that
+    normalised = M @ raw (homogeneous) — needed to map the opposing arch
+    (bite-registered raw frame) into this scan's working frame."""
+    mean = mesh.vertices.mean(axis=0)
+    verts = mesh.vertices - mean
     cov = np.cov(verts.T)
     eigvals, eigvecs = np.linalg.eigh(cov)          # ascending
     # columns: [smallest, middle, largest] variance
@@ -77,6 +83,7 @@ def normalise_orientation(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
     if np.linalg.det(axes) < 0:                     # keep right-handed
         axes[:, 1] = -axes[:, 1]
     rotated = verts @ axes
+    flip = np.eye(3)
 
     # Occlusal side up: tooth surfaces carry far more geometric detail than
     # the trimmed gingival base. Compare mean local curvature proxy
@@ -84,6 +91,7 @@ def normalise_orientation(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
     if _detail_score(mesh, rotated, top=True) < _detail_score(mesh, rotated, top=False):
         rotated[:, 2] = -rotated[:, 2]
         rotated[:, 1] = -rotated[:, 1]              # preserve handedness
+        flip = np.diag([1.0, -1.0, -1.0]) @ flip
 
     # Anterior toward +Y: the arch opens posteriorly, so vertex mass at the
     # anterior curve sits farther from the X axis on one side.
@@ -91,10 +99,18 @@ def normalise_orientation(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
     if np.abs(y.min()) > np.abs(y.max()):
         rotated[:, 1] = -rotated[:, 1]
         rotated[:, 0] = -rotated[:, 0]              # preserve handedness
+        flip = np.diag([-1.0, -1.0, 1.0]) @ flip
 
     out = mesh.copy()
     out.vertices = rotated
-    return out
+    if not return_transform:
+        return out
+    # normalised = flip @ axes.T @ (raw - mean)
+    M = np.eye(4)
+    linear = flip @ axes.T
+    M[:3, :3] = linear
+    M[:3, 3] = -linear @ mean
+    return out, M
 
 
 def _detail_score(mesh: trimesh.Trimesh, rotated: np.ndarray, top: bool) -> float:
@@ -204,7 +220,7 @@ def ingest(file_path: str, case_id: str, out_dir: str,
     mesh = _load_mesh(file_path)
     _validate(mesh, strict=strict)
 
-    mesh = normalise_orientation(mesh)
+    mesh, norm_transform = normalise_orientation(mesh, return_transform=True)
     metrics = extract_metrics(mesh)
     mesh, repairs = repair_if_needed(mesh, metrics)
     if repairs:
@@ -226,6 +242,8 @@ def ingest(file_path: str, case_id: str, out_dir: str,
 
     scan = IngestedScan(
         case_id=case_id, arch=arch, file_path=normalised_path,
+        raw_path=file_path,
+        norm_transform=[[float(x) for x in row] for row in norm_transform],
         original_filename=original_filename or os.path.basename(file_path),
         metrics=metrics, measurements=measurements, repairs_applied=repairs,
     )

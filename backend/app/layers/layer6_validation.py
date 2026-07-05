@@ -111,17 +111,30 @@ def _check2_thickness(rest, meshes) -> ValidationCheck:
 # ---------------------------------------------------------------- check 3
 
 def _check3_vertical_dimension(rest, meshes, framework) -> ValidationCheck:
+    """Each restoration's occlusal height vs its own target (which may be
+    opposing-arch-derived rather than a single flat plane)."""
     posteriors = [r for r in rest if _is_posterior(r.tooth_number)]
     if not posteriors:
         return ValidationCheck(check_number=3, name="vertical dimension", passed=True,
                                details="no posterior restorations; VD check not applicable")
-    achieved = max(float(meshes[r.tooth_number].vertices[:, 2].max()) for r in posteriors)
-    err = abs(achieved - framework.target_vd_z)
-    passed = err <= VD_TOLERANCE_MM
+    targets = {t.tooth_number: t.target_occlusal_z for t in framework.tooth_targets}
+    failures: dict[int, str] = {}
+    worst = 0.0
+    for r in posteriors:
+        tz = targets.get(r.tooth_number)
+        if tz is None:
+            continue
+        achieved = float(meshes[r.tooth_number].vertices[:, 2].max())
+        err = abs(achieved - tz)
+        worst = max(worst, err)
+        if err > VD_TOLERANCE_MM:
+            failures[r.tooth_number] = f"height {achieved:.2f}mm vs target {tz:.2f}mm"
     return ValidationCheck(
-        check_number=3, name="vertical dimension", passed=passed,
-        details=f"achieved VD z={achieved:.2f}mm vs target {framework.target_vd_z:.2f}mm "
-                f"(error {err:.2f}mm, tolerance ±{VD_TOLERANCE_MM}mm)")
+        check_number=3, name="vertical dimension", passed=not failures,
+        details=f"per-tooth occlusal height error ≤ {worst:.2f}mm "
+                f"(tolerance ±{VD_TOLERANCE_MM}mm)"
+                + (f"; {len(failures)} tooth/teeth out of tolerance" if failures else ""),
+        per_tooth_failures=failures)
 
 
 def _is_posterior(tooth: int) -> bool:

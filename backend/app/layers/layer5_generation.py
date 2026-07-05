@@ -197,17 +197,30 @@ def _fit_margin(pts_xy: np.ndarray, base_z: float, scan) -> np.ndarray:
 
 # ------------------------------------------------------------------ entry
 
+OCCLUSAL_CLEARANCE_MM = 0.05      # ground truth: lab contacts sit at 0.03–0.09mm
+MIN_CROWN_HEIGHT_MM = 3.0
+
+
 def generate_all(plan_restorations: list[PlannedRestoration],
                  framework: FrameworkConstraints,
-                 scan_path: str, out_dir: str) -> list[GeneratedRestoration]:
+                 scan_path: str, out_dir: str,
+                 opposing_raw_path: str | None = None,
+                 norm_transform: list | None = None) -> list[GeneratedRestoration]:
     """Priority-ordered generation. Molars first — verify VD reached before
     continuing (DEV_PLAN Step 6). Failures fall back to parametric, then
-    are marked failed without stopping the rest (PLAN Part 6)."""
+    are marked failed without stopping the rest (PLAN Part 6).
+
+    When the opposing arch is available (bite-registered raw scan +
+    this scan's normalisation transform), each crown's occlusal target is
+    the opposing surface minus clearance — build to the bite, like a lab."""
     os.makedirs(out_dir, exist_ok=True)
     scan = trimesh.load(scan_path, force="mesh")
     scan = _decimate_for_fitting(scan)
     targets = {t.tooth_number: t for t in framework.tooth_targets}
     _clamp_widths_to_slots(targets)
+    if opposing_raw_path and norm_transform is not None:
+        _apply_opposing_ceilings(targets, opposing_raw_path,
+                                 np.array(norm_transform, dtype=float))
     results: list[GeneratedRestoration] = []
 
     for priority in (1, 2, 3, 4):
@@ -247,6 +260,41 @@ def _clamp_widths_to_slots(targets: dict[int, "ToothTarget"]) -> None:
                                          0.995 * chords[0])
             d = mids[0] - pos
             t.tangent_deg = float(np.degrees(np.arctan2(d[1], d[0])))
+
+
+def _apply_opposing_ceilings(targets: dict[int, "ToothTarget"],
+                             opposing_raw_path: str,
+                             M: np.ndarray) -> None:
+    """Map the opposing arch (raw bite-registered frame) into this scan's
+    normalised frame via M, then cap each tooth's occlusal target at the
+    local opposing surface minus clearance. This is what establishes real
+    occlusal contact instead of an abstract plane."""
+    from scipy.spatial import cKDTree
+    try:
+        opp = trimesh.load(opposing_raw_path, force="mesh")
+    except Exception as e:
+        log.warning("could not load opposing scan (%s); using framework only", e)
+        return
+    v = np.asarray(opp.vertices)
+    v = (M[:3, :3] @ v.T).T + M[:3, 3]              # opposing in working frame
+    tree = cKDTree(v[:, :2])
+    for t in targets.values():
+        idx = tree.query_ball_point(np.array(t.position[:2]),
+                                    r=max(t.mesiodistal_width_mm * 0.5, 3.0))
+        if len(idx) < 20:
+            continue                                 # no opposing anatomy here
+        local_z = v[idx, 2]
+        # opposing occlusal surface = its lowest sheet above us
+        ceiling = float(np.percentile(local_z, 5)) - OCCLUSAL_CLEARANCE_MM
+        floor = t.position[2] + MIN_CROWN_HEIGHT_MM
+        new_z = max(min(t.target_occlusal_z, ceiling), floor)
+        if abs(new_z - t.target_occlusal_z) > 0.05:
+            log.info("tooth %d occlusal target %.2f -> %.2f (opposing-derived)",
+                     t.tooth_number, t.target_occlusal_z, new_z)
+        t.target_occlusal_z = new_z
+        if t.target_incisal_point is not None:
+            t.target_incisal_point[2] = max(
+                min(t.target_incisal_point[2], ceiling), floor)
 
 
 def _generate_one(r: PlannedRestoration, target: ToothTarget | None,

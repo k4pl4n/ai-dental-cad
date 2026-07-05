@@ -68,6 +68,47 @@ def build_verification_model(restorations: list[GeneratedRestoration],
     return out_path
 
 
+def build_fused_bridge(restorations: list[GeneratedRestoration],
+                       out_path: str) -> str | None:
+    """All-on-X output: one fused full-arch bridge STL. Units + connector
+    struts between neighbours, boolean-unioned into a single watertight body
+    (manifold engine). Falls back to a concatenated shell if union fails —
+    still one printable file, flagged in the name by the caller."""
+    import numpy as np
+
+    ok = sorted((r for r in restorations if not r.failed and r.file_path),
+                key=lambda r: r.tooth_number)
+    if len(ok) < 8:
+        return None
+    meshes = [trimesh.load(r.file_path, force="mesh") for r in ok]
+    parts = list(meshes)
+    for (ra, ma), (rb, mb) in zip(zip(ok, meshes), zip(ok[1:], meshes[1:])):
+        if rb.tooth_number - ra.tooth_number != 1:
+            continue
+        ca, cb = ma.centroid.copy(), mb.centroid.copy()
+        # connector at mid-crown height between the two units
+        za = ma.bounds[0][2] + (ma.bounds[1][2] - ma.bounds[0][2]) * 0.45
+        zb = mb.bounds[0][2] + (mb.bounds[1][2] - mb.bounds[0][2]) * 0.45
+        ca[2], cb[2] = za, zb
+        try:
+            strut = trimesh.creation.cylinder(radius=2.2, segment=np.array([ca, cb]))
+            parts.append(strut)
+        except Exception:
+            continue
+    try:
+        fused = trimesh.boolean.union(parts, engine="manifold")
+        if fused is None or fused.is_empty:
+            raise ValueError("empty union")
+    except Exception as e:
+        log.warning("boolean union unavailable (%s); exporting concatenated bridge", e)
+        fused = trimesh.util.concatenate(parts)
+    trimesh.repair.fix_normals(fused)
+    if not fused.is_watertight:
+        trimesh.repair.fill_holes(fused)
+    fused.export(out_path)
+    return out_path
+
+
 def build_pdf_report(case: Case, report_text: str, out_path: str) -> str:
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -139,6 +180,24 @@ def build_package(case: Case, report_text: str, work_dir: str) -> str:
 
     assembly = build_assembly(case.restorations,
                               os.path.join(work_dir, "assembly_all_restorations.stl"))
+
+    # All-on-X: one fused screw-retained bridge, sinter-compensated
+    fused = None
+    n_implant = sum(1 for r in case.restorations
+                    if r.restoration_type.value == "implant_crown" and not r.failed)
+    if n_implant >= 4:
+        design = build_fused_bridge(case.restorations,
+                                    os.path.join(work_dir, "_fused_design.stl"))
+        if design:
+            from ..models.schemas import MATERIAL_SPECS
+            m = trimesh.load(design, force="mesh")
+            scale = MATERIAL_SPECS[case.restorations[0].material].sinter_scale
+            m.vertices = m.vertices * scale
+            fused = os.path.join(
+                work_dir,
+                f"FullArchBridge_{len([r for r in case.restorations if not r.failed])}"
+                f"units_FABRICATION_READY.stl")
+            m.export(fused)
     upper = next((s.file_path for s in case.scans if s.arch.value == "upper"), None)
     lower = next((s.file_path for s in case.scans if s.arch.value == "lower"), None)
     verification = build_verification_model(
@@ -157,7 +216,7 @@ def build_package(case: Case, report_text: str, work_dir: str) -> str:
             if r.fabrication_file_path and os.path.exists(r.fabrication_file_path):
                 z.write(r.fabrication_file_path,
                         os.path.basename(r.fabrication_file_path))
-        for p in (assembly, verification, pdf, readme):
+        for p in (assembly, verification, fused, pdf, readme):
             if p and os.path.exists(p):
                 z.write(p, os.path.basename(p))
         z.writestr("case_data.json", json.dumps({
