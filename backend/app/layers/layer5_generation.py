@@ -66,6 +66,54 @@ def _bl_width(tooth_type: str, md_width: float) -> float:
                        "canine": 0.85, "incisor": 0.75}[tooth_type]
 
 
+# ---------------------------------------------------- anatomy template crown
+
+ANATOMY_DIR = os.path.join(os.path.dirname(__file__), "..", "anatomy")
+MIRROR_PAIRS = {**{n: 17 - n for n in range(1, 17)},
+                **{n: 49 - n for n in range(17, 33)}}
+
+
+def _template_crown(target: ToothTarget, arch_value: str,
+                    tooth_number: int, base_z: float) -> trimesh.Trimesh | None:
+    """Place a real anatomical template (extracted from this lab's own
+    finished work) into the slot: scale to width/height, rotate to the
+    local arch tangent, seat at base_z. Returns None if no template."""
+    path = os.path.join(ANATOMY_DIR, arch_value, f"tooth_{tooth_number}.stl")
+    mirrored = False
+    if not os.path.exists(path):
+        mirror = MIRROR_PAIRS.get(tooth_number)
+        path = os.path.join(ANATOMY_DIR, arch_value, f"tooth_{mirror}.stl")
+        mirrored = True
+        if not os.path.exists(path):
+            return None
+    try:
+        m = trimesh.load(path, force="mesh")
+    except Exception:
+        return None
+    if mirrored:
+        m.vertices[:, 0] = -m.vertices[:, 0]
+        m.invert()
+
+    ext = m.bounds[1] - m.bounds[0]
+    top_z = target.target_occlusal_z
+    if target.target_incisal_point is not None:
+        top_z = max(top_z, target.target_incisal_point[2])
+    height = max(top_z - base_z, MIN_CROWN_HEIGHT_MM)
+    s_u = target.mesiodistal_width_mm / max(ext[0], 1e-6)
+    s_w = min(s_u * 1.1, 10.5 / max(ext[1], 1e-6))   # buccolingual sanity cap
+    s_z = height / max(ext[2], 1e-6)
+    m.vertices = m.vertices * np.array([s_u, s_w, s_z])
+
+    ang = np.radians(target.tangent_deg)
+    rot = trimesh.transformations.rotation_matrix(ang, [0, 0, 1])
+    m.apply_transform(rot)
+    m.apply_translation([target.position[0], target.position[1], base_z])
+    if not m.is_watertight:
+        trimesh.repair.fix_normals(m)
+        trimesh.repair.fill_holes(m)
+    return m if m.is_watertight else None
+
+
 # ------------------------------------------------------- parametric crown
 
 def _crown_mesh(target: ToothTarget, tooth_type: str,
@@ -218,6 +266,13 @@ def generate_all(plan_restorations: list[PlannedRestoration],
     scan = _decimate_for_fitting(scan)
     targets = {t.tooth_number: t for t in framework.tooth_targets}
     _clamp_widths_to_slots(targets)
+    # fused-bridge cases: units must OVERLAP slightly so the boolean union
+    # produces one continuous prosthesis body, as a lab would wax it
+    bridge_mode = sum(1 for r in plan_restorations
+                      if r.restoration_type.value == "implant_crown") >= 4
+    if bridge_mode:
+        for t in targets.values():
+            t.mesiodistal_width_mm *= 1.06
     if opposing_raw_path and norm_transform is not None:
         _apply_opposing_ceilings(targets, opposing_raw_path,
                                  np.array(norm_transform, dtype=float))
@@ -312,6 +367,20 @@ def _generate_one(r: PlannedRestoration, target: ToothTarget | None,
 
     tooth_type = _tooth_type(r.tooth_number)
     base_z = _base_z(r, target, scan)
+
+    # first choice: this lab's own anatomy, placed like a technician would
+    mesh = _template_crown(target, framework.arch.value, r.tooth_number, base_z)
+    if mesh is not None:
+        gen.generation_method = "anatomy_template"
+        if r.restoration_type == RestorationType.IMPLANT_CROWN:
+            mesh = _bore_screw_channel(mesh, target)
+        elif r.restoration_type == RestorationType.BRIDGE_PONTIC:
+            mesh = _pontic_ridge_relief(mesh, scan, target)
+        name = f"{r.restoration_type.value.title().replace('_','')}_Tooth{r.tooth_number}_{r.material.value.title().replace('_','')}"
+        path = os.path.join(out_dir, f"{name}.stl")
+        mesh.export(path)
+        gen.file_path = path
+        return gen
 
     try:
         mesh = _crown_mesh(target, tooth_type, base_z, scan)

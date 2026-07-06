@@ -82,6 +82,21 @@ def build_fused_bridge(restorations: list[GeneratedRestoration],
         return None
     meshes = [trimesh.load(r.file_path, force="mesh") for r in ok]
     parts = list(meshes)
+    # cervical base: a continuous bar swept along the arch under the teeth —
+    # the body the teeth emerge from (like a lab's wax-up base). Capsule
+    # segments between consecutive units at cervical height.
+    def _cerv(m):
+        c = m.centroid.copy()
+        c[2] = m.bounds[0][2] + (m.bounds[1][2] - m.bounds[0][2]) * 0.24
+        return c
+    for ma, mb in zip(meshes, meshes[1:]):
+        pa, pb = _cerv(ma), _cerv(mb)
+        try:
+            bar = trimesh.creation.cylinder(radius=3.2,
+                                            segment=np.array([pa, pb]))
+            parts.append(bar)
+        except Exception:
+            continue
     for (ra, ma), (rb, mb) in zip(zip(ok, meshes), zip(ok[1:], meshes[1:])):
         if rb.tooth_number - ra.tooth_number != 1:
             continue
