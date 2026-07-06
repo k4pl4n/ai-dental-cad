@@ -327,11 +327,98 @@ def _generate_one(r: PlannedRestoration, target: ToothTarget | None,
             gen.failure_reason = f"generation failed: {e2}"
             return gen
 
+    # --- make the unit clinically seatable -------------------------------
+    if r.restoration_type == RestorationType.IMPLANT_CROWN:
+        mesh = _bore_screw_channel(mesh, target)
+    elif r.restoration_type == RestorationType.BRIDGE_PONTIC:
+        mesh = _pontic_ridge_relief(mesh, scan, target)
+
     name = f"{r.restoration_type.value.title().replace('_','')}_Tooth{r.tooth_number}_{r.material.value.title().replace('_','')}"
     path = os.path.join(out_dir, f"{name}.stl")
     mesh.export(path)
     gen.file_path = path
     return gen
+
+
+SCREW_CHANNEL_DIAMETER_MM = 3.0
+
+
+def _bore_screw_channel(mesh: trimesh.Trimesh, target: ToothTarget) -> trimesh.Trimesh:
+    """Screw-retained access: bore a vertical channel through the unit at
+    the abutment axis so the prosthetic screw can be placed and torqued.
+    Standard 3.0mm channel. Requires boolean difference (manifold)."""
+    try:
+        cx, cy, _ = target.position
+        zmin, zmax = mesh.bounds[0][2] - 1.0, mesh.bounds[1][2] + 1.0
+        drill = trimesh.creation.cylinder(
+            radius=SCREW_CHANNEL_DIAMETER_MM / 2.0,
+            segment=np.array([[cx, cy, zmin], [cx, cy, zmax]]))
+        out = trimesh.boolean.difference([mesh, drill], engine="manifold")
+        if out is None or out.is_empty:
+            raise ValueError("empty difference")
+        trimesh.repair.fix_normals(out)
+        return out
+    except Exception as e:
+        log.warning("screw channel boring failed (%s); unit left solid — "
+                    "flagged for technician", e)
+        return mesh
+
+
+def _pontic_ridge_relief(mesh: trimesh.Trimesh, scan: trimesh.Trimesh | None,
+                         target: ToothTarget) -> trimesh.Trimesh:
+    """Pontic basal surface: subtract the ridge tissue (offset slightly
+    downward) so the pontic sits with light, cleansable tissue contact
+    (modified ridge-lap) instead of a flat slab pressed into the gum."""
+    if scan is None:
+        return mesh
+    try:
+        from scipy.spatial import cKDTree
+        v = scan.vertices
+        tree = getattr(scan, "_aidcad_xy_tree", None)
+        if tree is None:
+            tree = cKDTree(v[:, :2])
+            scan._aidcad_xy_tree = tree
+        cx, cy, _ = target.position
+        r_mm = target.mesiodistal_width_mm * 0.75
+        idx = tree.query_ball_point(np.array([cx, cy]), r=r_mm)
+        if len(idx) < 50:
+            return mesh
+        local = v[idx]
+        # ridge surface as a coarse heightfield block, pushed 0.1mm INTO the
+        # pontic (light tissue contact after subtraction)
+        g = 14
+        gx = np.linspace(local[:, 0].min(), local[:, 0].max(), g)
+        gy = np.linspace(local[:, 1].min(), local[:, 1].max(), g)
+        boxes = []
+        step_x, step_y = gx[1] - gx[0], gy[1] - gy[0]
+        t2 = cKDTree(local[:, :2])
+        for x in gx:
+            for y in gy:
+                near = t2.query_ball_point([x, y], r=max(step_x, step_y))
+                if not near:
+                    continue
+                ridge_z = float(np.percentile(local[near, 2], 80)) - 0.1
+                b = trimesh.creation.box(
+                    extents=[step_x * 1.2, step_y * 1.2, 6.0],
+                    transform=trimesh.transformations.translation_matrix(
+                        [x, y, ridge_z - 3.0]))
+                boxes.append(b)
+        if not boxes:
+            return mesh
+        ridge_block = trimesh.boolean.union(boxes, engine="manifold")
+        out = trimesh.boolean.difference([mesh, ridge_block], engine="manifold")
+        if out is None or out.is_empty:
+            raise ValueError("empty difference")
+        # keep only the largest body (relief can shave slivers)
+        bodies = out.split(only_watertight=False)
+        if len(bodies) > 1:
+            out = max(bodies, key=lambda b: b.volume if b.is_volume else len(b.vertices))
+        trimesh.repair.fix_normals(out)
+        return out
+    except Exception as e:
+        log.warning("pontic ridge relief failed (%s); flat base kept — "
+                    "flagged for technician", e)
+        return mesh
 
 
 def _base_z(r: PlannedRestoration, target: ToothTarget, scan: trimesh.Trimesh) -> float:

@@ -99,6 +99,17 @@ def build_fused_bridge(restorations: list[GeneratedRestoration],
         fused = trimesh.boolean.union(parts, engine="manifold")
         if fused is None or fused.is_empty:
             raise ValueError("empty union")
+        # re-bore screw channels: connector struts must never plug them
+        drills = []
+        for r, m in zip(ok, meshes):
+            if r.restoration_type.value == "implant_crown":
+                c = m.centroid
+                drills.append(trimesh.creation.cylinder(
+                    radius=1.5,
+                    segment=np.array([[c[0], c[1], fused.bounds[0][2] - 1],
+                                      [c[0], c[1], fused.bounds[1][2] + 1]])))
+        if drills:
+            fused = trimesh.boolean.difference([fused] + drills, engine="manifold")
     except Exception as e:
         log.warning("boolean union unavailable (%s); exporting concatenated bridge", e)
         fused = trimesh.util.concatenate(parts)
