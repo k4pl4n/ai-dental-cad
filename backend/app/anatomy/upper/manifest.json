@@ -1,0 +1,114 @@
+{
+ "1": {
+  "file": "tooth_1.stl",
+  "md_mm": 8.8,
+  "bl_mm": 10.55,
+  "h_mm": 8.19,
+  "watertight": true
+ },
+ "2": {
+  "file": "tooth_2.stl",
+  "md_mm": 9.38,
+  "bl_mm": 10.55,
+  "h_mm": 8.1,
+  "watertight": true
+ },
+ "3": {
+  "file": "tooth_3.stl",
+  "md_mm": 9.96,
+  "bl_mm": 10.55,
+  "h_mm": 8.3,
+  "watertight": true
+ },
+ "4": {
+  "file": "tooth_4.stl",
+  "md_mm": 6.32,
+  "bl_mm": 8.0,
+  "h_mm": 8.28,
+  "watertight": true
+ },
+ "5": {
+  "file": "tooth_5.stl",
+  "md_mm": 6.8,
+  "bl_mm": 8.6,
+  "h_mm": 8.29,
+  "watertight": true
+ },
+ "6": {
+  "file": "tooth_6.stl",
+  "md_mm": 7.28,
+  "bl_mm": 9.21,
+  "h_mm": 9.5,
+  "watertight": true
+ },
+ "7": {
+  "file": "tooth_7.stl",
+  "md_mm": 6.22,
+  "bl_mm": 7.87,
+  "h_mm": 8.43,
+  "watertight": true
+ },
+ "8": {
+  "file": "tooth_8.stl",
+  "md_mm": 8.14,
+  "bl_mm": 10.3,
+  "h_mm": 8.91,
+  "watertight": true
+ },
+ "9": {
+  "file": "tooth_9.stl",
+  "md_mm": 8.14,
+  "bl_mm": 10.3,
+  "h_mm": 8.85,
+  "watertight": true
+ },
+ "10": {
+  "file": "tooth_10.stl",
+  "md_mm": 6.22,
+  "bl_mm": 7.86,
+  "h_mm": 8.45,
+  "watertight": true
+ },
+ "11": {
+  "file": "tooth_11.stl",
+  "md_mm": 7.28,
+  "bl_mm": 9.21,
+  "h_mm": 9.75,
+  "watertight": true
+ },
+ "12": {
+  "file": "tooth_12.stl",
+  "md_mm": 6.8,
+  "bl_mm": 8.6,
+  "h_mm": 8.27,
+  "watertight": true
+ },
+ "13": {
+  "file": "tooth_13.stl",
+  "md_mm": 6.32,
+  "bl_mm": 8.0,
+  "h_mm": 6.99,
+  "watertight": true
+ },
+ "14": {
+  "file": "tooth_14.stl",
+  "md_mm": 9.96,
+  "bl_mm": 10.55,
+  "h_mm": 8.12,
+  "watertight": true
+ },
+ "15": {
+  "file": "tooth_15.stl",
+  "md_mm": 9.38,
+  "bl_mm": 10.55,
+  "h_mm": 8.08,
+  "watertight": true
+ },
+ "16": {
+  "file": "tooth_16.stl",
+  "md_mm": 8.81,
+  "bl_mm": 9.36,
+  "h_mm": 7.5,
+  "watertight": true
+ }
+}
